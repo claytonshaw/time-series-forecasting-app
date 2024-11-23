@@ -190,7 +190,7 @@ def main():
                     "num_units": st.number_input("Number of units per layer", 1, 128, value=16),
                     "activation": st.selectbox("Activation function", ["tanh", "relu", "sigmoid"]),
                     "optimizer": st.selectbox("Optimizer", ["adam", "sgd", "rmsprop"]),
-                    "learning_rate": st.number_input("Learning rate (optional)", min_value=0.0001, max_value=1.0, step=0.0001, value=0.001),
+                    "learning_rate": st.number_input("Learning rate (optional)", 0.0001, 1.0, step=0.0001, value=0.001, format="%.4f"),
                     "look_back": st.number_input("Look-back window size", 1, 365, value=3),
                     "epochs": st.number_input("Number of epochs", 1, 1000, value=200),
                     "batch_size": st.number_input("Batch size", 1, 128, value=32)
