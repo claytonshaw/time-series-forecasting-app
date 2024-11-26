@@ -95,9 +95,8 @@ def lstm_forecast(df, target_variable, train_size, look_back=3, epochs=200, batc
     X, y = create_sequences(data, look_back)
     X = X.reshape(X.shape[0], X.shape[1], 1)
 
-    train_size = int(len(X) * train_size)
-    X_train, X_test = X[:train_size], X[train_size:]
-    y_train, y_test = y[:train_size], y[train_size:]
+    X_train, X_test = manual_train_test_split(X, train_size)
+    y_train, y_test = manual_train_test_split(y, train_size)
 
     if lstm_params is None:
         lstm_params = {}
@@ -149,14 +148,13 @@ def lstm_forecast(df, target_variable, train_size, look_back=3, epochs=200, batc
 def xgboost_forecast(df,target_variable, train_size, lags=12, forecast_periods=12, xgboost_params=None):
     for lag in range(1, lags+1):
         df[f'lag_{lag}'] = df[target_variable].shift(lag)
-    #df.dropna(inplace=True)
+    df.dropna(inplace=True)
     features = [f'lag_{lag}' for lag in range(1, lags+1)]
     X = df[features]
     y = df[target_variable]
     
-    train_size = int(len(X) * train_size)
-    X_train, X_test = X[:train_size], X[train_size:]
-    y_train, y_test = y[:train_size], y[train_size:]
+    X_train, X_test = manual_train_test_split(X, train_size)
+    y_train, y_test = manual_train_test_split(y, train_size)
     
     if xgboost_params is None:
         xgboost_params = {}
