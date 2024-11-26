@@ -175,7 +175,7 @@ def xgboost_forecast(df,target_variable, train_size, lags=12, forecast_periods=1
         last_known = np.roll(last_known, -1)
         last_known[-1] = future_pred
     
-    return y_pred, y_test, future_preds
+    return y_pred, y_test, future_preds, y_train
 
 # main function to run the app
 def main():
@@ -313,7 +313,7 @@ def main():
                         st.plotly_chart(fig, use_container_width=True)
                 elif model_choice == "XGBoost":
                     with st.spinner(f"Running {model_choice} Forecast..."):
-                        y_pred, y_test, future_preds = xgboost_forecast(
+                        y_pred, y_test, future_preds, y_train = xgboost_forecast(
                             df, target_variable, train_size=train_size,
                             lags=xgboost_params.get("lags", 12),
                             forecast_periods=forecast_periods,
@@ -332,7 +332,7 @@ def main():
                         # Plot results
                         st.subheader(f"{model_choice} Forecast for {target_variable}")
                         fig = plot_interactive_forecast(
-                            y_train=y[:int(len(y) * train_size)],
+                            y_train=y_train,
                             y_test=y_test_series,
                             y_pred=y_pred_series,
                             y_forecast=future_series,
