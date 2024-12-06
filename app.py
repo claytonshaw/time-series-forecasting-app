@@ -11,6 +11,14 @@ from sklearn.preprocessing import MinMaxScaler
 import tensorflow as tf
 from xgboost import XGBRegressor
 
+'''
+Need to add the following steps to the app:
+Clean and preprocess the data (handle missing values, remove outliers, etc.).
+Prepare your data for modeling by splitting it into training, validation, and testing sets.
+Evaluate model performance using metrics like RMSE, MAE, and MAPE.
+Compare results across models and provide insights on forecasting accuracy.
+'''
+
 # Utility functions
 def try_multiple_formats(value):
     formats = ['%m/%d/%Y','%Y-%b','%y-%b']
