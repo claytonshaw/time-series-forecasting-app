@@ -31,13 +31,42 @@ def calculate_metrics(y_true, y_pred):
     return {"RMSE": rmse, "MAE": mae, "SMAPE": smape}
 
 @st.cache_data
+def try_multiple_formats(value):
+    formats = [
+    '%d/%m/%Y', '%Y/%m/%d', '%m/%d/%Y',
+    '%d-%m-%Y', '%Y-%m-%d', '%m-%d-%Y',
+    '%d-%b-%Y', '%d/%b/%Y', '%Y-%b-%d',
+    '%d-%B-%Y', '%B %d, %Y', '%Y-%B-%d',
+    '%Y-%m', '%Y-%b', '%y-%b',
+    '%d-%b', '%d/%m', '%b %d',
+    '%d-%m-%Y %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%d/%m/%Y %I:%M %p',
+    '%s'
+]
+    for fmt in formats:
+        try:
+            parsed = pd.to_datetime(value, format=fmt, errors='coerce')
+            if parsed is not pd.NaT:
+                return parsed
+        except ValueError:
+            continue
+    return pd.NaT
+
 def preprocess_file(uploaded_file):
     try:
         df = pd.read_csv(uploaded_file)
         if len(df.columns) < 2:
             st.error("The uploaded file must have at least two columns.")
             return None
-        df[df.columns[0]] = pd.to_datetime(df[df.columns[0]], infer_datetime_format=True)
+        try:
+            # Attempt to parse dates using multiple formats
+            df[df.columns[0]] = df[df.columns[0]].apply(try_multiple_formats)
+
+            # Check for invalid rows (NaT values)
+            invalid_rows = df[df[df.columns[0]].isna()]
+            if not invalid_rows.empty:
+                st.warning("Some dates could not be parsed and were set to NaT.")
+        except Exception as e:
+            st.error(f"Error processing dates: {e}")
         df = df.groupby(df.columns[0]).sum().reset_index()
         time_series = df.iloc[:, -1]  # Assuming last column is the time series data
         return time_series
