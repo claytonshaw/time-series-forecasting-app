@@ -12,6 +12,7 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 import seaborn as sns
 from concurrent.futures import ThreadPoolExecutor
 import time
+from dateutil.parser import ParserError
 
 # Set theme for Matplotlib
 plt.style.use('dark_background')
@@ -36,6 +37,10 @@ def preprocess_file(uploaded_file):
         if len(df.columns) < 2:
             st.error("The uploaded file must have at least two columns.")
             return None
+        try:
+            df[df.columns[0]] = pd.to_datetime(df[df.columns[0]], infer_datetime_format=True)
+        except (ParserError, ValueError) as e:
+            print(f"Error in detecting date format: {e}")
         df = df.groupby(df.columns[0]).sum().reset_index()
         time_series = df.iloc[:, -1]  # Assuming last column is the time series data
         return time_series
