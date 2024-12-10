@@ -10,14 +10,14 @@ from keras.layers import LSTM, Dense, Dropout
 import matplotlib.pyplot as plt
 from statsmodels.tsa.seasonal import seasonal_decompose
 import seaborn as sns
-from time import sleep
 from concurrent.futures import ThreadPoolExecutor
+import time
 
 # Set theme for Matplotlib
 plt.style.use('dark_background')
 sns.set_theme(style="darkgrid", rc={"axes.facecolor": "#1a1a1a", "grid.color": "#333333"})
 
-# Helper functions
+# Helper Functions
 @st.cache_data
 def calculate_metrics(y_true, y_pred):
     y_true = np.array(y_true)
@@ -43,7 +43,36 @@ def preprocess_file(uploaded_file):
         st.error(f"Error reading the file: {e}")
         return None
 
-def run_ets_model(time_series, trend, seasonal, damped_trend, seasonal_periods):
+def plot_decomposition(decomposition, time_series):
+    """Plots the decomposition components."""
+    fig, ax = plt.subplots(4, 1, figsize=(10, 8), sharex=True)
+    components = ["Original", "Trend", "Seasonal", "Residual"]
+    colors = ["#39ff14", "#00ccff", "#ffcc00", "#ff5050"]
+    data = [time_series, decomposition.trend, decomposition.seasonal, decomposition.resid]
+
+    for i, (comp, color) in enumerate(zip(components, colors)):
+        ax[i].plot(data[i], label=comp, color=color)
+        ax[i].set_title(comp, fontsize=12, color="white")
+        legend = ax[i].legend(loc="upper left", fontsize=10, facecolor="#1a1a1a", edgecolor="#333333")
+        plt.setp(legend.get_texts(), color="white")
+        ax[i].set_facecolor("#1a1a1a")
+        ax[i].tick_params(axis="x", colors="white")
+        ax[i].tick_params(axis="y", colors="white")
+
+    plt.tight_layout()
+    return fig
+
+def time_model_execution(model_function, *args, **kwargs):
+    """Times the execution of a model."""
+    start_time = time.time()
+    result = model_function(*args, **kwargs)
+    execution_time = time.time() - start_time
+    st.write(f"{model_function.__name__} executed in {execution_time:.2f} seconds.")
+    return result
+
+# Model Functions
+# Define ETS model
+def run_ets_model(time_series, trend, seasonal, damped_trend, seasonal_periods, steps=12):
     ets_model = ExponentialSmoothing(
         time_series,
         trend=trend if trend != "none" else None,
@@ -51,9 +80,10 @@ def run_ets_model(time_series, trend, seasonal, damped_trend, seasonal_periods):
         seasonal_periods=seasonal_periods,
         damped_trend=damped_trend,
     ).fit()
-    return ets_model.forecast(steps=12)
+    return ets_model.forecast(steps=steps)
 
-def run_arima_model(time_series, p, d, q, P, D, Q, m, use_seasonality):
+# Define ARIMA/SARIMA model
+def run_arima_model(time_series, p, d, q, P, D, Q, m, use_seasonality, steps=12):
     if use_seasonality:
         from statsmodels.tsa.statespace.sarimax import SARIMAX
         model = SARIMAX(
@@ -63,9 +93,10 @@ def run_arima_model(time_series, p, d, q, P, D, Q, m, use_seasonality):
         ).fit(disp=False)
     else:
         model = ARIMA(time_series, order=(p, d, q)).fit()
-    return model.forecast(steps=12)
+    return model.forecast(steps=steps)
 
-def run_xgboost_model(time_series, lags, learning_rate, n_estimators, max_depth):
+# Define XGBoost model
+def run_xgboost_model(time_series, lags, learning_rate, n_estimators, max_depth, steps=12):
     X = np.array([time_series.shift(i) for i in range(1, lags + 1)]).T[lags:]
     y = time_series[lags:]
     model = xgb.XGBRegressor(
@@ -73,10 +104,11 @@ def run_xgboost_model(time_series, lags, learning_rate, n_estimators, max_depth)
         n_estimators=n_estimators,
         max_depth=max_depth,
     )
-    model.fit(X[:-12], y[:-12])
-    return model.predict(X[-12:])
+    model.fit(X[:-steps], y[:-steps])
+    return model.predict(X[-steps:])
 
-def run_lstm_model(time_series, lags, lstm_units, lstm_layers, dropout, epochs, batch_size):
+# Define LSTM model
+def run_lstm_model(time_series, lags, lstm_units, lstm_layers, dropout, epochs, batch_size, steps=12):
     X = np.array([time_series.shift(i) for i in range(1, lags + 1)]).T[lags:]
     y = time_series[lags:]
     X = X.reshape((X.shape[0], X.shape[1], 1))
@@ -87,8 +119,8 @@ def run_lstm_model(time_series, lags, lstm_units, lstm_layers, dropout, epochs, 
     model.add(Dense(1))
     model.add(Dropout(dropout))
     model.compile(optimizer="adam", loss="mse")
-    model.fit(X[:-12], y[:-12], epochs=epochs, batch_size=batch_size, verbose=0)
-    return model.predict(X[-12:]).flatten()
+    model.fit(X[:-steps], y[:-steps], epochs=epochs, batch_size=batch_size, verbose=0)
+    return model.predict(X[-steps:]).flatten()
 
 # Streamlit App
 st.title("Univariate Time Series Forecasting App")
@@ -148,26 +180,14 @@ if time_series is not None:
     # Decomposition and visualization
     st.subheader("Time Series Decomposition")
     seasonal_period = st.sidebar.number_input("Seasonal Period for Decomposition", min_value=1, max_value=365, value=12)
-    try:
-        decomposition = seasonal_decompose(time_series, model="additive", period=seasonal_period)
-        fig, ax = plt.subplots(4, 1, figsize=(10, 8), sharex=True)
-        components = ["Original", "Trend", "Seasonal", "Residual"]
-        colors = ["#39ff14", "#00ccff", "#ffcc00", "#ff5050"]
-        data = [time_series, decomposition.trend, decomposition.seasonal, decomposition.resid]
 
-        for i, (comp, color) in enumerate(zip(components, colors)):
-            ax[i].plot(data[i], label=comp, color=color)
-            ax[i].set_title(comp, fontsize=12, color="white")
-            legend = ax[i].legend(loc="upper left", fontsize=10, facecolor="#1a1a1a", edgecolor="#333333")
-            plt.setp(legend.get_texts(), color="white")
-            ax[i].set_facecolor("#1a1a1a")
-            ax[i].tick_params(axis="x", colors="white")
-            ax[i].tick_params(axis="y", colors="white")
-
-        plt.tight_layout()
-        st.pyplot(fig)
-    except Exception as e:
-        st.error(f"Decomposition failed: {e}")
+    # Add an expander for decomposition plots
+    with st.expander("Show Decomposition Plots"):
+        try:
+            decomposition = seasonal_decompose(time_series, model="additive", period=seasonal_period)
+            st.pyplot(plot_decomposition(decomposition, time_series))
+        except Exception as e:
+            st.error(f"Decomposition failed: {e}")
 
     # Run forecast
     if st.button("Run Forecast"):
@@ -178,10 +198,10 @@ if time_series is not None:
         results = {}
         with ThreadPoolExecutor() as executor:
             futures = {
-                "ETS": executor.submit(run_ets_model, time_series, trend, seasonal, damped_trend, seasonal_periods),
-                "ARIMA": executor.submit(run_arima_model, time_series, p, d, q, P, D, Q, m, use_seasonality),
-                "XGBoost": executor.submit(run_xgboost_model, time_series, lags, learning_rate, n_estimators, max_depth),
-                "LSTM": executor.submit(run_lstm_model, time_series, lags, lstm_units, lstm_layers, dropout, epochs, batch_size)
+                "ETS": executor.submit(time_model_execution, run_ets_model, time_series, trend, seasonal, damped_trend, seasonal_periods),
+                "ARIMA": executor.submit(time_model_execution, run_arima_model, time_series, p, d, q, P, D, Q, m, use_seasonality),
+                "XGBoost": executor.submit(time_model_execution, run_xgboost_model, time_series, lags, learning_rate, n_estimators, max_depth),
+                "LSTM": executor.submit(time_model_execution, run_lstm_model, time_series, lags, lstm_units, lstm_layers, dropout, epochs, batch_size)
             }
 
             for i, (model, future) in enumerate(futures.items(), 1):
@@ -194,7 +214,7 @@ if time_series is not None:
         # Visualization
         fig, ax = plt.subplots(figsize=(10, 6))
 
-        # plotting the original time series
+        # Plot original time series
         ax.plot(time_series, label="Actual", color="#39ff14")
 
         forecasts = {
@@ -205,7 +225,7 @@ if time_series is not None:
         }
 
         for label, forecast in forecasts.items():
-            ax.plot(range(len(time_series), len(time_series) + 12), forecast, label=label)
+            ax.plot(range(len(time_series), len(time_series) + 12), forecast, label=label, linestyle="--")
 
         ax.set_title("Forecast Comparison", fontsize=12, color="white")
         legend = ax.legend(loc="upper left", fontsize=10, facecolor="#1a1a1a", edgecolor="#333333")
@@ -218,9 +238,11 @@ if time_series is not None:
         st.pyplot(fig)
 
         # Metrics Table
-        st.write("Performance Metrics")
-        metrics_df = pd.DataFrame(results).T
-        st.dataframe(metrics_df)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("Performance Metrics")
+            metrics_df = pd.DataFrame(results).T
+            st.dataframe(metrics_df)
 
         progress_bar.progress(100)
         status_text.text("Forecasting Completed!")
