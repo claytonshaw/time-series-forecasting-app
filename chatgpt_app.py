@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 from statsmodels.tsa.seasonal import seasonal_decompose
 from concurrent.futures import ThreadPoolExecutor
 from sklearn.model_selection import train_test_split
