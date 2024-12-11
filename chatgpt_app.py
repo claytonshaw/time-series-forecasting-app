@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from statsmodels.tsa.seasonal import seasonal_decompose
 from concurrent.futures import ThreadPoolExecutor
+import plotly.graph_objects as go
 from helpers import (
     calculate_metrics,
     preprocess_file,
@@ -70,7 +71,30 @@ time_series = preprocess_file(uploaded_file) if uploaded_file else None
 if time_series is not None:
     # Display uploaded data
     st.write("Uploaded Data")
-    st.line_chart(time_series)
+        # Create an interactive Plotly figure for the original time series
+    fig_original = go.Figure()
+    
+    # Add the original time series
+    fig_original.add_trace(go.Scatter(
+        x=time_series.index,
+        y=time_series.values,
+        mode='lines',
+        name='Original Time Series',
+        line=dict(color='#39ff14')
+    ))
+    
+    # Customize layout
+    fig_original.update_layout(
+        title="Original Time Series",
+        xaxis_title="Time",
+        yaxis_title="Value",
+        template="plotly_dark",
+        legend=dict(title="Legend"),
+        height=400
+    )
+    
+    # Render Plotly chart in Streamlit
+    st.plotly_chart(fig_original, use_container_width=True)
 
     # Decomposition and visualization
     st.subheader("Time Series Decomposition")
@@ -115,31 +139,54 @@ if time_series is not None:
                     st.error(f"{model} failed: {e}")
                 progress_bar.progress(i / len(futures))
 
-        # Visualization
-        fig, ax = plt.subplots(figsize=(10, 6))
+            # Create an interactive Plotly figure
+            fig = go.Figure()
 
-        # Plot original time series
-        ax.plot(time_series, label="Actual", color="#39ff14")
+            # Add the original time series
+            fig.add_trace(go.Scatter(
+                x=time_series.index,
+                y=time_series.values,
+                mode='lines',
+                name='Actual',
+                line=dict(color='#39ff14')
+            ))
 
-        forecasts = {
-            "ETS Forecast": run_ets_model(time_series, trend, seasonal, damped_trend, seasonal_periods),
-            "ARIMA Forecast": run_arima_model(time_series, p, d, q, P, D, Q, m, use_seasonality),
-            "XGBoost Forecast": run_xgboost_model(time_series, lags, learning_rate, n_estimators, max_depth),
-            "LSTM Forecast": run_lstm_model(time_series, lags, lstm_units, lstm_layers, dropout, epochs, batch_size)
-        }
+            # Add forecasts
+            forecasts = {
+                "ETS Forecast": run_ets_model(time_series, trend, seasonal, damped_trend, seasonal_periods),
+                "ARIMA Forecast": run_arima_model(time_series, p, d, q, P, D, Q, m, use_seasonality),
+                "XGBoost Forecast": run_xgboost_model(time_series, lags, learning_rate, n_estimators, max_depth),
+                "LSTM Forecast": run_lstm_model(time_series, lags, lstm_units, lstm_layers, dropout, epochs, batch_size)
+            }
 
-        for label, forecast in forecasts.items():
-            ax.plot(range(len(time_series), len(time_series) + 12), forecast, label=label, linestyle="--")
+            for label, forecast in forecasts.items():
+                # Convert range to a list for Plotly
+                future_index = list(range(len(time_series), len(time_series) + len(forecast)))
+                fig.add_trace(go.Scatter(
+                    x=future_index,
+                    y=forecast,
+                    mode='lines',
+                    name=label,
+                    line=dict(dash='dash')
+                ))
 
-        ax.set_title("Forecast Comparison", fontsize=12, color="white")
-        legend = ax.legend(loc="upper left", fontsize=10, facecolor="#1a1a1a", edgecolor="#333333")
-        plt.setp(legend.get_texts(), color="white")
-        ax.set_facecolor("#1a1a1a")
-        ax.tick_params(axis="x", colors="white")
-        ax.tick_params(axis="y", colors="white")
+            # Customize layout
+            fig.update_layout(
+                title="Forecast Comparison",
+                xaxis_title="Time",
+                yaxis_title="Value",
+                template="plotly_dark",
+                legend=dict(title="Legend",
+                            x=0.01,
+                            y=0.99,
+                            bgcolor='rgba(0,0,0,0.5)',
+                            bordercolor='black',
+                            borderwidth=1),
+                height=600
+            )
 
-        plt.tight_layout()
-        st.pyplot(fig)
+            # Render Plotly chart in Streamlit
+            st.plotly_chart(fig, use_container_width=True)
 
         # Metrics Table
         col1, col2 = st.columns(2)
