@@ -43,11 +43,15 @@ def run_xgboost_model(time_series, lags, learning_rate, n_estimators, max_depth,
     model.fit(X[:-steps], y[:-steps])
     return model.predict(X[-steps:])
 
-# Define LSTM model
 def run_lstm_model(time_series, lags, lstm_units, lstm_layers, dropout, epochs, batch_size, steps=12):
+    # Prepare the data
     X = np.array([time_series.shift(i) for i in range(1, lags + 1)]).T[lags:]
     y = time_series[lags:]
     X = X.reshape((X.shape[0], X.shape[1], 1))
+    # Split data into train and validation
+    X_train, X_val = X[:-steps], X[-steps:]
+    y_train, y_val = y[:-steps], y[-steps:]
+    # Define the model
     model = Sequential()
     for _ in range(lstm_layers - 1):
         model.add(LSTM(lstm_units, activation="relu", return_sequences=True))
@@ -55,5 +59,15 @@ def run_lstm_model(time_series, lags, lstm_units, lstm_layers, dropout, epochs, 
     model.add(Dense(1))
     model.add(Dropout(dropout))
     model.compile(optimizer="adam", loss="mse")
-    model.fit(X[:-steps], y[:-steps], epochs=epochs, batch_size=batch_size, verbose=0)
-    return model.predict(X[-steps:]).flatten()
+    # Train the model with validation data
+    history = model.fit(
+        X_train, y_train,
+        validation_data=(X_val, y_val),
+        epochs=epochs,
+        batch_size=batch_size,
+        verbose=0
+    )
+    # Forecast
+    predictions = model.predict(X_val).flatten()
+    # Return predictions and loss history
+    return predictions, history.history['loss'], history.history['val_loss']
