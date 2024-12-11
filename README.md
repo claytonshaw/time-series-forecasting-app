@@ -1,7 +1,7 @@
 # Time Series Forecasting Application
 
 ## Overview
-This Streamlit application provides a comprehensive platform for time series forecasting using various models, including ETS, ARIMA, LSTM, and XGBoost. It allows users to upload time series data, preprocess it, and evaluate forecast accuracy using interactive visualizations and performance metrics.
+This Streamlit application provides a comprehensive platform for time series forecasting using various models, including ETS, ARIMA, LSTM, and XGBoost. It allows users to upload time series data, preprocess it, and evaluate forecast accuracy using interactive visualizations and performance metrics. It is the final project for my deep forecasting class.
 
 ## Features
 - **Data Upload and Exploration**: Upload a CSV file, select the target variable, and explore the data.
